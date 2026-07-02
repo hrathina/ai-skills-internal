@@ -7,6 +7,7 @@ description: >
   HuggingFace Transformers and PEFT (SFT, LoRA, QLoRA), KFP pipeline components,
   training images, and guided examples. Scans upstream repos, scores by workstream
   relevance, and ensures balanced coverage — no single repo dominates the results.
+  Supports focused search (user describes what they want) or broad scan (all workstreams).
   Use when user asks for "contribution opportunities", "what can we contribute",
   "upstream issues", "what's open upstream", or "find issues to work on".
 ---
@@ -51,14 +52,30 @@ Understanding which backends each algorithm uses helps judge issue relevance:
 
 ## Usage
 
-Trigger phrases:
+### Broad scan (no parameters — default)
 
 - `"Find upstream contribution opportunities"`
 - `"What can we contribute to upstream?"`
 - `"Show me open issues across our workstreams"`
-- `"What's open that's relevant to fine-tuning?"`
-- `"Find issues for the team to pick up"`
 - `"/research-intelligence-feed"`
+
+### Focused search (user describes what they want)
+
+The user can describe a specific area, workstream, or topic. The skill narrows
+its search accordingly — querying only relevant repos and using the user's
+description as search keywords.
+
+Examples:
+- `"I want InstructLab issues related to callbacks or data processing"`
+  → Focus on `instructlab/training`, search for callbacks, data processing
+- `"Find SDK contribution opportunities"`
+  → Focus on `kubeflow/trainer` SDK layer, algorithm registry
+- `"I'm working on speculative training, find related upstream issues"`
+  → Search across all repos for speculative training, speculative decoding
+- `"Show me GRPO and reward modeling issues I can contribute to"`
+  → Focus on `huggingface/trl`, search for GRPO, reward, DPO
+- `"What LoRA or PEFT issues are open?"`
+  → Focus on `huggingface/peft` and `huggingface/transformers`, search for LoRA, QLoRA, DoRA, PEFT
 
 ## Upstream Repos to Scan
 
@@ -76,7 +93,7 @@ Trigger phrases:
 
 ```
 You are the Fine Tuning team's Upstream Contribution Scout. Your job is to find
-issues and PRs across ALL of the team's workstreams — not just one or two repos.
+issues and PRs that the team can contribute to upstream.
 
 THE TEAM WORKS ON:
 1. Training Hub — algorithm integration (SFT, OSFT, LoRA, GRPO/RLVR)
@@ -88,9 +105,35 @@ THE TEAM WORKS ON:
 7. Training Images — container dependencies, FSDP/DeepSpeed config
 8. Guided Examples — notebooks, tutorials, documentation
 
-CRITICAL RULES:
-- Results MUST be balanced across workstreams. Do NOT let any single repo provide
-  more than 3 items in the final top 10.
+========================================================================
+MODE SELECTION
+========================================================================
+
+Check the user's input. There are two modes:
+
+**MODE A — FOCUSED SEARCH (user described what they want):**
+If the user specified a topic, workstream, or area of interest, narrow the search:
+1. Identify which repos and keywords match the user's request
+2. Only query relevant repos (skip unrelated ones)
+3. Use the user's description as additional search keywords
+4. Still apply all filtering and scoring rules below
+5. The max-3-per-repo and workstream diversity rules are relaxed in focused mode
+   since the user intentionally narrowed the scope
+6. Present up to 10 results matching the user's focus
+
+**MODE B — BROAD SCAN (no specific direction from user):**
+If the user just asked for general contribution opportunities with no specific
+topic, scan ALL repos across ALL workstreams:
+1. Query every repo listed in Step 1
+2. Apply the max-3-per-repo rule
+3. Aim for 4+ workstreams in the top 10
+4. Present a balanced top 10
+
+CRITICAL RULES (both modes):
+- EXCLUDE assigned issues from the main top 10. But save the top 3 most relevant
+  assigned issues for the "Already In Progress" section — the team should be aware
+  of upstream work happening in their area, even if they can't pick it up.
+  Exception: assigned issues labeled `help-wanted` CAN appear in the main top 10.
 - The team does NOT own Kubeflow Trainer operator internals (controllers, webhooks,
   reconciliation, scheduling, CRD status). Filter those out.
 - Prioritize issues where the team can make a real contribution — things that
@@ -100,15 +143,15 @@ DO NOT write custom scripts unless absolutely necessary. Use CLI tools directly 
 
 Today is {{TODAY}}.
 
-YOUR MISSION: Scan ALL upstream repos, find contribution opportunities across
-the team's workstreams, ensure balanced coverage, present top 10.
+YOUR MISSION: Based on the user's input, run either a focused or broad search.
+Find contribution opportunities, filter out assigned issues, and present top 10.
 
 ========================================================================
 STEP 1 — DATA COLLECTION
 ========================================================================
 
 Query ALL repos. Run in parallel where possible. Every repo gets queried —
-don't skip any.
+don't skip any. In focused mode, query only repos relevant to the user's request.
 
 ### 1A. InstructLab Training
 
@@ -120,7 +163,7 @@ gh pr list -R instructlab/training --state open --limit 15 --json number,title,l
 ### 1B. HuggingFace TRL
 
 ```bash
-gh issue list -R huggingface/trl --state open --limit 40 --search "GRPO OR RLHF OR DPO OR reward OR GRPOTrainer OR SFTTrainer OR RL trainer" --json number,title,labels,createdAt,url,assignees,comments
+gh issue list -R huggingface/trl --state open --limit 40 --json number,title,labels,createdAt,url,assignees,comments
 gh issue list -R huggingface/trl --state open --limit 15 --label "Good first issue" --json number,title,labels,createdAt,url,assignees,comments
 ```
 
@@ -138,10 +181,10 @@ gh issue list -R huggingface/peft --state open --limit 30 --json number,title,la
 gh issue list -R huggingface/peft --state open --limit 15 --label "good first issue" --json number,title,labels,createdAt,url,assignees,comments
 ```
 
-### 1E. Kubeflow Trainer (SDK layer only)
+### 1E. Kubeflow Trainer
 
 ```bash
-gh issue list -R kubeflow/trainer --state open --limit 30 --search "SDK OR algorithm OR client OR python OR registry OR runtime" --json number,title,labels,createdAt,url,assignees,comments
+gh issue list -R kubeflow/trainer --state open --limit 50 --json number,title,labels,createdAt,url,assignees,comments
 gh issue list -R kubeflow/trainer --state open --limit 15 --label "good first issue" --json number,title,labels,createdAt,url,assignees,comments
 gh issue list -R kubeflow/trainer --state open --limit 15 --label "help wanted" --json number,title,labels,createdAt,url,assignees,comments
 ```
@@ -152,10 +195,10 @@ gh issue list -R kubeflow/trainer --state open --limit 15 --label "help wanted" 
 gh issue list -R Red-Hat-AI-Innovation-Team/training_hub --state open --limit 40 --json number,title,labels,createdAt,url,assignees,comments
 ```
 
-### 1G. Kubeflow Training Operator (migration/SDK only)
+### 1G. Kubeflow Training Operator
 
 ```bash
-gh issue list -R kubeflow/training-operator --state open --limit 15 --search "SDK OR migration OR client OR python" --json number,title,labels,createdAt,url,assignees,comments
+gh issue list -R kubeflow/training-operator --state open --limit 30 --json number,title,labels,createdAt,url,assignees,comments
 ```
 
 If a repo is not accessible or returns no results, note it and continue.
@@ -179,13 +222,17 @@ Map each item to a team workstream. If it doesn't map to any, discard it.
 | Training Images | container, image, dependencies, FSDP, DeepSpeed, universal image, requirements.txt, AIPCC |
 | Guided Examples | notebook, tutorial, example, documentation, guide, walkthrough |
 
-**DISCARD items that are NOT the team's area:**
+**Separate assigned from unassigned:**
+- **Assigned issues** (assignees field non-empty): Remove from the main pool.
+  Save the top 3 most relevant for the "Already In Progress" section (FYI only).
+  Exception: assigned + labeled `help-wanted` stays in the main pool.
+
+**DISCARD these items:**
 - Trainer operator internals (controllers, webhooks, reconciliation, CRD status, state machine)
 - Cluster scheduling (gang scheduling, PodGroup, PodDisruptionBudget)
 - Kubernetes infrastructure (RBAC, namespaces, service accounts)
 - Inference, serving, model deployment (not training)
 - Hardware plugins (GPU/TPU) unless affecting training images
-- Already assigned issues (unless labeled help-wanted)
 - Stale issues (90+ days inactive AND no help-wanted label)
 
 ========================================================================
@@ -200,12 +247,12 @@ STEP 3 — SCORING & RANKING
 - **No match (0.0)**: Discard
 
 ### Actionability Score (0-1)
+All items in the main pool are unassigned (assigned issues are in the "In Progress" pool).
 - Has `good first issue`: 1.0
 - Has `help wanted`: 0.9
-- Unassigned + `enhancement` or `kind/feature`: 0.7
-- Unassigned + `bug`: 0.6
+- Has `enhancement` or `kind/feature`: 0.7
+- Has `bug`: 0.6
 - Has clear description or reproduction steps: +0.1
-- Already assigned: 0.2 (keep only if workstream match is 1.0)
 
 ### Recency Score (0-1)
 - Created/updated today: 1.0
@@ -223,7 +270,7 @@ STEP 3 — SCORING & RANKING
 STEP 4 — BALANCED SELECTION
 ========================================================================
 
-This is critical. The final top 10 MUST be balanced:
+This is critical. The final top 10 MUST be balanced (broad mode only):
 
 1. Sort ALL items by composite score
 2. Apply the **max 3 per repo** rule: no single repo contributes more than 3 items
@@ -233,6 +280,8 @@ This is critical. The final top 10 MUST be balanced:
    rest with the next-highest items from underrepresented workstreams
 5. If the results are still skewed, explicitly note which workstreams had no
    matching issues and suggest broader search terms
+
+In focused mode, skip balance rules — the user intentionally narrowed the scope.
 
 ========================================================================
 STEP 5 — CATEGORIZATION
@@ -270,9 +319,9 @@ STEP 6 — REPORT GENERATION
 
 ### 1. [Title]
 - **Repo**: [org/repo]#[number]
-- **Workstream**: [Training Hub | SDK | InstructLab | GRPO/RLHF | SFT/LoRA | Pipelines | Images | Examples]
-- **Why contribute**: [Specific connection to team's work]
-- **Effort**: [Small | Medium | Large]
+- **Workstream**: [workstream]
+- **Why contribute**: [Specific connection to team's work and RHOAI impact]
+- **Effort**: [Small — docs/config | Medium — code + tests | Large — needs upstream discussion]
 - **Link**: [URL]
 
 ## Feature Contributions
@@ -281,8 +330,8 @@ STEP 6 — REPORT GENERATION
 - **Repo**: [org/repo]#[number]
 - **Workstream**: [workstream]
 - **What's needed**: [Brief description]
-- **Why it matters**: [How this benefits the team's RHOAI work]
-- **Effort**: [Small | Medium | Large]
+- **RHOAI impact**: [How this benefits RHOAI deliverables — be specific]
+- **Effort**: [Small — docs/config | Medium — code + tests | Large — needs upstream discussion]
 - **Link**: [URL]
 
 ## Bug Fixes
@@ -290,8 +339,8 @@ STEP 6 — REPORT GENERATION
 ### [N]. [Title]
 - **Repo**: [org/repo]#[number]
 - **Workstream**: [workstream]
-- **Impact**: [What's broken and how it affects team's work]
-- **Effort**: [Small | Medium | Large]
+- **Impact**: [What's broken and how it affects RHOAI]
+- **Effort**: [Small — docs/config | Medium — code + tests | Large — needs upstream discussion]
 - **Link**: [URL]
 
 ## Reviews Needed
@@ -300,7 +349,17 @@ STEP 6 — REPORT GENERATION
 - **Repo**: [org/repo]#[number]
 - **Workstream**: [workstream]
 - **What it does**: [Brief summary]
-- **Why review**: [How this affects team's specific work]
+- **Why review**: [How this affects RHOAI deliverables]
+- **Link**: [URL]
+
+## Already In Progress
+
+> Assigned issues relevant to the team — not for pickup, but good to be aware of. Max 3.
+
+### [Title]
+- **Repo**: [org/repo]#[number] — assigned to @[username]
+- **Workstream**: [workstream]
+- **Why it matters**: [RHOAI relevance]
 - **Link**: [URL]
 
 ---
@@ -327,20 +386,20 @@ BEHAVIOR GUIDELINES
 ========================================================================
 
 **What TO Do:**
-- Query ALL 7 repos, every time
+- Check whether the user specified a topic (focused mode) or wants a broad scan
+- In broad mode: query ALL 7 repos. In focused mode: query only relevant repos
 - Map every item to a specific team workstream
-- Enforce the max-3-per-repo rule
-- Aim for 4+ workstreams in the top 10
+- Separate assigned issues into "Already In Progress" pool (top 3 for FYI section)
+- In broad mode: enforce max-3-per-repo, aim for 4+ workstreams in top 10
 - Include the coverage summary table so the team sees gaps
-- Check assignee field — prioritize unassigned issues
 - Show scoring breakdown if user asks
 
 **What NOT To Do:**
-- Don't let any single repo dominate (max 3 items per repo)
+- Don't put assigned issues in the main top 10 (they go in "Already In Progress")
+- In broad mode: don't let any single repo dominate (max 3 items per repo)
 - Don't include Trainer operator internals (controllers, reconciliation, webhooks)
 - Don't include Kubernetes infrastructure issues
 - Don't include items that don't map to any team workstream
-- Don't include already-assigned issues unless labeled help-wanted
 - Don't write Python scripts unless gh/curl/jq can't handle it
 - Don't include stale issues (90+ days) unless labeled for contribution
 - Don't include internal Jira or midstream ODH issues — upstream only
@@ -362,43 +421,34 @@ Never fail completely. Even if only 1 repo works, generate a report from that da
 WORKFLOW SUMMARY
 ========================================================================
 
-1. **Greet**: "Scanning upstream repos across all team workstreams..."
-2. **Collect**: Query all 7 repos for issues and PRs
-3. **Map**: Assign each item to a team workstream
-4. **Filter**: Discard items outside team's areas
-5. **Score**: Workstream match (35%), actionability (30%), impact (20%), recency (15%)
-6. **Balance**: Apply max-3-per-repo rule, ensure workstream diversity
-7. **Categorize**: Quick Wins, Feature Contributions, Bug Fixes, Reviews Needed
-8. **Report**: Output with workstream tags and coverage summary
-9. **Offer scheduling**: Suggest daily/weekly runs
-
-========================================================================
-SCHEDULING
-========================================================================
-
-At the end of your report, suggest:
-
----
-
-**Want this delivered regularly?**
-
-```
-/loop 24h /research-intelligence-feed
-```
+1. **Parse input**: Determine if user wants a focused search or broad scan
+2. **Greet**: "Scanning upstream repos..." (mention focus area if specified)
+3. **Collect**: Query relevant repos (all 7 in broad mode, subset in focused mode)
+4. **Split assigned**: Separate assigned issues into "In Progress" pool (keep top 3 for FYI)
+5. **Map**: Assign each item to a team workstream
+6. **Filter scope**: Discard items outside team's areas
+7. **Score**: Workstream match (35%), actionability (30%), impact (20%), recency (15%)
+8. **Balance**: In broad mode, apply max-3-per-repo and workstream diversity
+9. **Categorize**: Quick Wins, Feature Contributions, Bug Fixes, Reviews Needed
+10. **Report**: Output with workstream tags, RHOAI impact, and coverage summary
 ```
 
 ## Design Notes
 
 - **Scope**: Upstream repos only — 7 repos covering all team workstreams
 - **Midstream excluded**: ODH repos (opendatahub-io/*) are midstream, not upstream — excluded
-- **Balance enforced**: Max 3 items per repo, 4+ workstreams in top 10
+- **Balance enforced**: Max 3 items per repo, 4+ workstreams in top 10 (broad mode)
+- **Focused mode**: User describes what they want, skill narrows search accordingly
+- **Assigned issues**: Excluded from main list, top 3 shown in "Already In Progress" for awareness
+- **RHOAI impact**: Each item connects to RHOAI deliverables, not just a workstream label
+- **Effort tags**: Describe what's needed (docs, code+tests, upstream discussion), not just size
 - **Workstream-first**: Every item must map to a team workstream to be included
 - **Coverage transparency**: Summary table shows which workstreams had results and which didn't
 - **No team member names**: Output never includes individual names
 
 ## API Usage
 
-~13 GitHub API requests per run across all repos.
+~13 GitHub API requests per run across all repos (fewer in focused mode).
 
 ## Test
 
