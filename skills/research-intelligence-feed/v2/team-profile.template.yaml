@@ -1,0 +1,63 @@
+# Team Profile — fill this out or run the skill without it to auto-generate
+#
+# This file tells the skill what repos to scan, what workstreams your team owns,
+# and what to filter out. Every team has different upstream repos and focus areas.
+
+team: ""                          # Your team name, e.g. "Fine Tuning"
+product: ""                       # Product you ship into, e.g. "RHOAI Training and Experimentation"
+
+workstreams:
+  # Add one entry per workstream your team owns.
+  # Each workstream maps to one or more upstream repos and has keywords
+  # used to match GitHub issues to that workstream.
+  #
+  # Example:
+  #
+  # - name: InstructLab Training
+  #   repos:
+  #     - instructlab/training
+  #   keywords:
+  #     - callbacks
+  #     - training loop
+  #     - data processing
+  #     - checkpointing
+  #
+  # - name: RLVR/GRPO
+  #   repos:
+  #     - huggingface/trl
+  #   keywords:
+  #     - GRPO
+  #     - GRPOTrainer
+  #     - RLHF
+  #     - DPO
+  #     - reward
+
+  - name: ""
+    repos:
+      - ""
+    keywords:
+      - ""
+
+# Optional: map internal components/algorithms to their upstream backend.
+# Helps the skill judge whether an issue is relevant to your team's integration work.
+#
+# backend_mapping:
+#   - name: SFT
+#     backend: instructlab/training
+#     watch_for: training loop, data processing, callbacks
+#   - name: LoRA SFT
+#     backend: huggingface/peft
+#     watch_for: LoRA injection, QLoRA, DoRA
+
+exclude:
+  # Topics to always filter out (issues matching these are discarded)
+  topics: []
+  # e.g. [inference, serving, RBAC, scheduling, deployment]
+
+  # Repos to never scan (glob patterns supported)
+  repos: []
+  # e.g. [opendatahub-io/*]
+
+  # Labels to skip
+  labels: []
+  # e.g. [wontfix, stale, duplicate]
